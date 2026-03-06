@@ -11,8 +11,15 @@ function stripBase(pathname) {
 }
 
 function isZh() {
-  return stripBase(location.pathname).startsWith("zh/");
+  const strippedPath = stripBase(location.pathname);
+  // 规则：以en/开头 → 非中文；其他情况（含根路径、zh/开头）→ 中文
+  return !strippedPath.startsWith("en/");
 }
+
+//function isZh() {
+//  return stripBase(location.pathname).startsWith("zh/");
+//}
+
 function lang() {
   return isZh() ? "zh" : "en";
 }
