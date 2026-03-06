@@ -43,28 +43,30 @@ async function inject(selector, url) {
     return;
   }
   el.innerHTML = await res.text();
+  // 注入后返回元素，确保DOM已更新
+  return el;
 }
 
 function setNav() {
+  // 增加容错：先检查核心元素是否存在
+  const headerEl = document.getElementById("site-header");
+  if (!headerEl) return console.warn("Header DOM 未加载");
+
   const L = lang();
   const labels = {
     en: { news: "News", people: "People", publications: "Publications", join: "Join Us", toggle: "中文" },
     zh: { news: "新闻", people: "成员", publications: "论文", join: "加入我们", toggle: "EN" }
   };
 
-  // // Brand -> 课题组主页
-  // const brand = document.getElementById("brand-link");
-  // if (brand) brand.href = absPath(`${L}/index.html`);
-
-  // Nav
-  document.querySelectorAll(".nav-link").forEach(a => {
+  // Nav - 增加更宽松的选择器，确保匹配header内的.nav-link
+  document.querySelectorAll("#site-header .nav-link").forEach(a => {
     const key = a.getAttribute("data-key");
     if (!key) return;
     a.textContent = labels[L][key] ?? a.textContent;
     a.href = absPath(`${L}/${key}/index.html`);
   });
 
-  // Language toggle
+  // Language toggle - 限定header内的元素
   const t = document.getElementById("lang-toggle");
   if (t) {
     t.textContent = labels[L].toggle;
@@ -72,19 +74,29 @@ function setNav() {
     t.href = absPath(ensureIndex(pairPath(targetLang)));
   }
 
-  // Active highlight
-  const p = stripBase(location.pathname);
+  // Active highlight - 优化路径匹配逻辑
+  const p = stripBase(location.pathname).toLowerCase();
   let active = "";
-  if (p.includes("news/")) active = "news";
-  else if (p.includes("people/")) active = "people";
-  else if (p.includes("publications/")) active = "publications";
-  else if (p.includes("join/")) active = "join";
-  if (active) document.querySelector(`.nav-link[data-key="${active}"]`)?.classList.add("active");
+  if (p.includes("news")) active = "news";
+  else if (p.includes("people")) active = "people";
+  else if (p.includes("publications")) active = "publications";
+  else if (p.includes("join")) active = "join";
+
+  // 增加容错，避免空选择器报错
+  const activeLink = document.querySelector(`#site-header .nav-link[data-key="${active}"]`);
+  if (activeLink) activeLink.classList.add("active");
 }
 
+// 核心修复：等待header注入并渲染完成后再执行setNav
 (async function () {
-  // 注意：partials 在根目录，必须用 absPath
-  await inject("#site-header", absPath("partials/header.html"));
-  await inject("#site-footer", absPath("partials/footer.html"));
-  setNav();
+  try {
+    // 先注入header，等待DOM更新
+    await inject("#site-header", absPath("partials/header.html"));
+    // 注入footer
+    await inject("#site-footer", absPath("partials/footer.html"));
+    // 延迟执行setNav，确保header内的DOM完全渲染
+    setTimeout(setNav, 0);
+  } catch (e) {
+    console.error("页面渲染出错：", e);
+  }
 })();
